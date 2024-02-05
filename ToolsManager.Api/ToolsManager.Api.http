@@ -1,0 +1,6 @@
+@ToolsManager.Api_HostAddress = http://localhost:5225
+
+GET {{ToolsManager.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
