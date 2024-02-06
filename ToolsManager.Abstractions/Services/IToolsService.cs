@@ -4,5 +4,5 @@ namespace ToolsManager.Abstractions.Services;
 
 public interface IToolsService
 {
-    ValueTask<UploadedTool> UploadNewTool(Stream toolStream, string userName, CancellationToken cancellationToken);
+    ValueTask<Result<UploadedTool>> UploadNewTool(Stream toolStream, ToolFileInfo info, CancellationToken cancellationToken);
 }

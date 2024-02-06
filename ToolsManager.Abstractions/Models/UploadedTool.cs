@@ -1,3 +1,3 @@
 ﻿namespace ToolsManager.Abstractions.Models;
 
-public record UploadedTool(Guid Id);
+public sealed record UploadedTool(Guid Id, ToolFileInfo Info);

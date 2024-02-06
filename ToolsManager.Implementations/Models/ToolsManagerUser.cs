@@ -2,7 +2,7 @@
 
 namespace ToolsManager.Implementations.Models;
 
-public class ToolsManagerUser : IdentityUser
+public sealed class ToolsManagerUser : IdentityUser
 {
     
 }

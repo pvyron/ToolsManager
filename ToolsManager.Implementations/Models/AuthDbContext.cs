@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ToolsManager.Implementations.Models;
 
-public class AuthDbContext : IdentityDbContext<ToolsManagerUser>
+public sealed class AuthDbContext : IdentityDbContext<ToolsManagerUser>
 {
     public AuthDbContext(DbContextOptions<AuthDbContext> dbContextOptions) : base(dbContextOptions)
     {

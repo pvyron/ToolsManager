@@ -1,5 +1,7 @@
-﻿using Azure.Data.Tables;
+﻿using System.Security.Claims;
+using Azure.Data.Tables;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Options;
 using ToolsManager.Abstractions.Models;
 using ToolsManager.Abstractions.Services;
@@ -21,22 +23,53 @@ public sealed class ToolsService : IToolsService
         _tableClient = new TableClient(options.Value.StorageConnectionString, options.Value.TableName);
     }
     
-    public async ValueTask<UploadedTool> UploadNewTool(Stream toolStream, string userName, CancellationToken cancellationToken)
+    public async ValueTask<Result<UploadedTool>> UploadNewTool(Stream toolStream, ToolFileInfo info, CancellationToken cancellationToken)
     {
         var toolId = Guid.NewGuid();
-        _logger.LogInformation("Generated new guid: {toolId}", toolId);
+
+        //_logger.LogInformation("Generated new guid: {toolId}", toolId);
         ToolTableEntity toolEntity = new()
         {
-            PartitionKey = userName,
+            PartitionKey = info.UserId,
             RowKey = toolId.ToString(),
             UploadDate = DateTimeOffset.UtcNow
         };
         var toolBlobTask = _blobContainerClient.UploadBlobAsync(toolId.ToString(), toolStream, cancellationToken);
-        _logger.LogInformation("Starter uploading id: {toolId}", toolId);
+        //_logger.LogInformation("Starter uploading id: {toolId}", toolId);
         var toolTableResult = await _tableClient.AddEntityAsync(toolEntity, cancellationToken);
-        _logger.LogInformation("Uploaded to table storage id: {toolId}", toolId);
+
+        if (toolTableResult.IsError)
+        {
+            if (!toolBlobTask.IsCompleted) toolBlobTask.Dispose();
+            
+            return ToolTableEntryFailed;
+        }
+        
+        //_logger.LogInformation("Uploaded to table storage id: {toolId}", toolId);
         var toolBlobResult = await toolBlobTask;
-        _logger.LogInformation("Completed upload of id: {toolId}", toolId);
-        return new UploadedTool(toolId);
+
+        if (!toolBlobResult.HasValue)
+        {
+            await _tableClient.DeleteEntityAsync(toolEntity.PartitionKey, toolEntity.RowKey, cancellationToken: cancellationToken);
+
+            return ToolBlobUploadFailed;
+        }
+        
+        var metaDataResult = await _blobContainerClient.GetBlobClient(toolId.ToString())
+            .SetMetadataAsync(info.ToMetadataDictionary(), cancellationToken: cancellationToken);
+
+        if (!metaDataResult.HasValue)
+        {
+            return ToolBlobMetadataFailed;
+        }
+        
+        //_logger.LogInformation("Completed upload of id: {toolId}", toolId);
+        return new UploadedTool(toolId, info);
     }
+
+
+    private static readonly Error<UploadedTool> ToolTableEntryFailed = new("Tools.Upload.Table", "Failed to index file");
+    private static readonly Error<UploadedTool> ToolBlobUploadFailed = new("Tools.Upload.Blob", "Failed to upload file");
+    private static readonly Error<UploadedTool> ToolBlobMetadataFailed = new("Tools.Upload.Metadata", "Failed to attach metadata to file");
 }
+
