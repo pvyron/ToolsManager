@@ -3,8 +3,12 @@ using Azure;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Mvc;
+using ToolsManager.Abstractions.Services;
+using ToolsManager.Implementations;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.InstallToolsServices();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAntiforgery();
@@ -31,47 +35,31 @@ var basic = "Basic ";
 
 app.MapPost("/api/tools/new", async (
     [FromHeader(Name = "Authorization")] string authorizationHeader, 
-    [FromServices] IHttpContextAccessor contextAccessor,
-    [FromForm] IFormCollection formFile) =>
+    [FromServices] IToolsService toolsService,
+    [FromForm] IFormCollection formFile,
+    CancellationToken cancellationToken) =>
 {
-    if (!authorizationHeader.StartsWith(basic))
-        return Results.Unauthorized();
-
-    var credentialsPart = authorizationHeader[6..];
-
-    var decodedCredentials = Encoding.UTF8.GetString(Convert.FromBase64String(credentialsPart));
-
-    var credentials = decodedCredentials.Split(':');
-    var userName = credentials[0];
-    var password = credentials[1];
-
-    var fileName = Guid.NewGuid().ToString();
-
-    var blobClient = new BlobContainerClient(
-        "",
-        "tools");
-
-    if (!await blobClient.ExistsAsync())
-        await blobClient.CreateAsync();
-
-    var tableClient = new TableClient(
-        "",
-        "tools");
-    
-    await tableClient.CreateIfNotExistsAsync();
-    
-    var newBlob = await blobClient.UploadBlobAsync(fileName, formFile.Files[0].OpenReadStream());
-
-    var newTool = tableClient.AddEntity(new ToolTableEntity
+    try
     {
-        PartitionKey = userName,
-        RowKey = fileName
-    });
-    
-    if (newBlob.HasValue && !newTool.IsError)
-        return Results.Ok($"Uploaded {Convert.ToBase64String(newBlob.Value.ContentHash)}");
+        if (!authorizationHeader.StartsWith(basic))
+            return Results.Unauthorized();
 
-    return Results.BadRequest();
+        var credentialsPart = authorizationHeader[6..];
+
+        var decodedCredentials = Encoding.UTF8.GetString(Convert.FromBase64String(credentialsPart));
+
+        var credentials = decodedCredentials.Split(':');
+        var userName = credentials[0];
+        var password = credentials[1];
+
+        var result = await toolsService.UploadNewTool(formFile.Files[0].OpenReadStream(), userName, cancellationToken);
+
+        return Results.Ok($"Uploaded {result}");
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new {ex.Message, ex.StackTrace});
+    }
 }).DisableAntiforgery(); // need to change that https://github.com/dotnet/aspnetcore/issues/51052
 
 app.Run();

@@ -5,13 +5,16 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <InvariantGlobalization>true</InvariantGlobalization>
+        <UserSecretsId>a33dcf75-db38-45c9-851f-0741df5c9ee7</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Azure.Data.Tables" Version="12.8.2" />
-        <PackageReference Include="Azure.Storage.Blobs" Version="12.20.0-beta.1" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0"/>
         <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\ToolsManager.Implementations\ToolsManager.Implementations.csproj" />
     </ItemGroup>
 
 </Project>
