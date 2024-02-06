@@ -1,7 +1,4 @@
 using System.Text;
-using Azure;
-using Azure.Data.Tables;
-using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Mvc;
 using ToolsManager.Abstractions.Services;
 using ToolsManager.Implementations;
@@ -19,6 +16,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.ValidateToolsServices();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -63,12 +62,3 @@ app.MapPost("/api/tools/new", async (
 }).DisableAntiforgery(); // need to change that https://github.com/dotnet/aspnetcore/issues/51052
 
 app.Run();
-
-
-class ToolTableEntity : ITableEntity
-{
-    public required string PartitionKey { get; set; }
-    public required string RowKey { get; set; }
-    public DateTimeOffset? Timestamp { get; set; }
-    public ETag ETag { get; set; }
-}
