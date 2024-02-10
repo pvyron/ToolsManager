@@ -20,27 +20,10 @@ public static class ToolEndpoints
 
             if (files.Count == 0)
                 return Results.Empty;
-            
-            List<UploadedTool> uploadedTools = new();
-            List<(Error, ToolFileInfo)> errors = new();
-            foreach (var file in files)
-            {
-                ToolFileInfo info = new()
-                {
-                    UserId = claimsPrincipal.Identity!.Name!,
-                    Key = file.Name,
-                    Name = Path.GetFileNameWithoutExtension(file.FileName),
-                    Extension = Path.GetExtension(file.FileName)
-                };
-                
-                var result =
-                    await toolsService.UploadNewTool(file.OpenReadStream(), info, cancellationToken);
 
-                if (result.IsSuccess)
-                    uploadedTools.Add(result.Value!);
-                else
-                    errors.Add((result.Error, info));
-            }
+            var newToolUploadTasks = toolsService.UploadNewToolsTasks(files, claimsPrincipal, cancellationToken);
+
+            var (uploadedTools, errors) = await ToolsMethods.ResolveUploadNewToolsTasks(newToolUploadTasks);
 
             if (errors.Count == 0)
                 return Results.Ok(uploadedTools);
@@ -49,6 +32,25 @@ public static class ToolEndpoints
                 return Results.BadRequest(errors);
 
             return Results.BadRequest(new { uploadedTools, errors });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { ex.Message, ex.StackTrace });
+        }
+    }
+
+    public static async ValueTask<IResult> GetUserTools(
+        [FromServices] IToolsService toolsService,
+        ClaimsPrincipal claimsPrincipal,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tools = await toolsService.GetUserTools(claimsPrincipal.Identity!.Name!, cancellationToken);
+
+            if (tools.IsFailure) return Results.BadRequest(tools.Error.ToString());
+
+            return Results.Ok(tools.Value);
         }
         catch (Exception ex)
         {

@@ -25,4 +25,6 @@ app.MapPost("/api/tools/new", ToolEndpoints.UploadNewTool)
     .DisableAntiforgery()  // need to change that https://github.com/dotnet/aspnetcore/issues/51052
     .RequireAuthorization();
 
+app.MapGet("/api/tools", ToolEndpoints.GetUserTools);
+
 app.Run();

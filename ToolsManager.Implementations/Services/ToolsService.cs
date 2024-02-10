@@ -1,4 +1,6 @@
-﻿using System.Security.Claims;
+﻿using System.Runtime.CompilerServices;
+using System.Security.Claims;
+using Azure;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -27,27 +29,23 @@ public sealed class ToolsService : IToolsService
     {
         var toolId = Guid.NewGuid();
 
-        //_logger.LogInformation("Generated new guid: {toolId}", toolId);
         ToolTableEntity toolEntity = new()
         {
             PartitionKey = info.UserId,
             RowKey = toolId.ToString(),
             UploadDate = DateTimeOffset.UtcNow
         };
+        
         var toolBlobTask = _blobContainerClient.UploadBlobAsync(toolId.ToString(), toolStream, cancellationToken);
-        //_logger.LogInformation("Starter uploading id: {toolId}", toolId);
         var toolTableResult = await _tableClient.AddEntityAsync(toolEntity, cancellationToken);
 
         if (toolTableResult.IsError)
         {
-            if (!toolBlobTask.IsCompleted) toolBlobTask.Dispose();
-            
+            toolBlobTask.Dispose();
             return ToolTableEntryFailed;
         }
         
-        //_logger.LogInformation("Uploaded to table storage id: {toolId}", toolId);
         var toolBlobResult = await toolBlobTask;
-
         if (!toolBlobResult.HasValue)
         {
             await _tableClient.DeleteEntityAsync(toolEntity.PartitionKey, toolEntity.RowKey, cancellationToken: cancellationToken);
@@ -58,13 +56,53 @@ public sealed class ToolsService : IToolsService
         var metaDataResult = await _blobContainerClient.GetBlobClient(toolId.ToString())
             .SetMetadataAsync(info.ToMetadataDictionary(), cancellationToken: cancellationToken);
 
-        if (!metaDataResult.HasValue)
-        {
-            return ToolBlobMetadataFailed;
-        }
+        if (!metaDataResult.HasValue) return ToolBlobMetadataFailed;
         
-        //_logger.LogInformation("Completed upload of id: {toolId}", toolId);
         return new UploadedTool(toolId, info);
+    }
+
+    public async Task<Result<List<ToolInfo>>> GetUserTools(string userId,
+        CancellationToken cancellationToken)
+    {
+        var query = _tableClient.QueryAsync<ToolTableEntity>(toolEntity => toolEntity.PartitionKey == userId);
+
+        List<ToolInfo> infos = [];
+        await foreach (var entityPage in QueryToolsByPartitionKey(_tableClient, userId, cancellationToken))
+        {
+            // TODO make parallel!!!
+            foreach (var entity in entityPage.Values)
+            {
+                var info = await GetToolFileMetadata(_blobContainerClient, entity.RowKey, cancellationToken);
+                
+                if (info is null)
+                    continue;
+                
+                infos.Add(info);
+            }
+        }
+
+        return infos;
+    }
+
+    private static async IAsyncEnumerable<Page<ToolTableEntity>> QueryToolsByPartitionKey(TableClient tableClient, string partitionKey,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var query = tableClient.QueryAsync<ToolTableEntity>(toolEntity => toolEntity.PartitionKey == partitionKey);
+        
+        await foreach (var entityPage in query.AsPages().WithCancellation(cancellationToken))
+        {
+            yield return entityPage;
+        }
+    }
+
+    private static async ValueTask<ToolInfo?> GetToolFileMetadata(BlobContainerClient blobContainerClient, string id, CancellationToken cancellationToken)
+    {
+        var propertiesResponse = await blobContainerClient.GetBlobClient(id).GetPropertiesAsync(cancellationToken: cancellationToken);
+
+        if (!propertiesResponse.HasValue)
+            return null;
+
+        return ToolInfo.Parse(id, propertiesResponse.Value.Metadata);
     }
 
 
