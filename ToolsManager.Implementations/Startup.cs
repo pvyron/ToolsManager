@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using MassTransit;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ToolsManager.Abstractions.Services;
@@ -37,6 +38,15 @@ public static class Startup
         builder.Services.AddSingleton<IValidateOptions<ToolsSettings>, ToolsSettingsValidator>();
         builder.Services.Configure<ToolsSettings>(builder.Configuration.GetSection(ToolsSettings.SettingsName));
         builder.Services.AddSingleton<IToolsService, ToolsService>();
+
+        builder.Services.AddMassTransit(configurator =>
+        {
+            configurator.SetKebabCaseEndpointNameFormatter();
+
+            configurator.AddConsumer<ToolsEventHandler>();
+
+            configurator.UsingInMemory((context, config) => config.ConfigureEndpoints(context));
+        });
     }
     
     public static void ValidateToolsServices(this IHost host)

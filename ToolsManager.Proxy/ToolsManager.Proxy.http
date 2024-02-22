@@ -1,0 +1,6 @@
+@ToolsManager.Proxy_HostAddress = http://localhost:5178
+
+GET {{ToolsManager.Proxy_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

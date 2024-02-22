@@ -8,6 +8,11 @@ public static class ToolsMethods
 {
     public static (ValueTask<Result<UploadedTool>> task, ToolFileInfo info)[] UploadNewToolsTasks(
         this IToolsService toolsService, IFormFileCollection files, ClaimsPrincipal claimsPrincipal,
+        CancellationToken cancellationToken) =>
+        toolsService.UploadNewToolsTasks(files, Enumerable.Empty<string>(), claimsPrincipal, cancellationToken);
+    
+    public static (ValueTask<Result<UploadedTool>> task, ToolFileInfo info)[] UploadNewToolsTasks(
+        this IToolsService toolsService, IFormFileCollection files, IEnumerable<string> shareWith, ClaimsPrincipal claimsPrincipal,
         CancellationToken cancellationToken)
     {
         var newToolUploadTasks = new (ValueTask<Result<UploadedTool>> task, ToolFileInfo info)[files.Count];
@@ -21,7 +26,7 @@ public static class ToolsMethods
                 Extension = Path.GetExtension(files[i].FileName)
             };
 
-            newToolUploadTasks[i] = (toolsService.UploadNewTool(files[i].OpenReadStream(), info, cancellationToken),
+            newToolUploadTasks[i] = (toolsService.UploadNewTool(files[i].OpenReadStream(), info, shareWith, cancellationToken),
                 info);
         }
 
